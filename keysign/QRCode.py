@@ -19,7 +19,7 @@ import logging
 import StringIO
 
 from gi.repository import Gdk, Gtk, GdkPixbuf
-from qrencode import encode_scaled
+import qrcode
 
 log = logging.getLogger()
 
@@ -81,7 +81,7 @@ class QRImage(Gtk.DrawingArea):
         data = self.data
         box = self.get_allocation()
         width, height = box.width, box.height
-        size = min(width, height) - 10
+        size = min(width, height)
         if data is not None:
             pixbuf = self.image_to_pixbuf(self.create_qrcode(data, size))
             Gdk.cairo_set_source_pixbuf(cr, pixbuf, width//2 - size//2, height//2 - size//2)
@@ -92,8 +92,11 @@ class QRImage(Gtk.DrawingArea):
     def create_qrcode(data, size):
         '''Creates a PIL image for the data given'''
         log.debug('Encoding %s', data)
-        version, width, image = encode_scaled(data,size,0,1,2,True)
-        return image
+        #size//30 adjusts the qrcode image sizing to the correct size
+        qr = qrcode.QRCode(version=1, box_size=size//30, border=2)
+        qr.add_data(data)
+        qr.make(fit=True)
+        return qr.make_image()
 
 
     @staticmethod

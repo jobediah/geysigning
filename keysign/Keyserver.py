@@ -101,7 +101,6 @@ class ServeKeyThread(Thread):
         tries = 10
 
         kd = data if data else self.keydata
-        fpr = fpr if fpr else "FIXME fingerprint"
 
         class KeyRequestHandler(KeyRequestHandlerBase):
             '''You will need to create this during runtime'''
@@ -187,15 +186,19 @@ if __name__ == '__main__':
     if len(sys.argv) >= 2:
         fname = sys.argv[1]
         KEYDATA = open(fname, 'r').read()
+        # FIXME: Someone needs to determine the fingerprint
+        #        of the data just read
+        fpr = ''.join('F289 F7BA 977D F414 3AE9  FDFB F70A 0290 6C30 1813'.split())
     else:
         KEYDATA = 'Example data'
+        fpr = ''.join('F289 F7BA 977D F414 3AE9  FDFB F70A 0290 6C30 1813'.split())
 
     if len(sys.argv) >= 3:
         timeout = int(sys.argv[2])
     else:
         timeout = 5
 
-    t = ServeKeyThread(KEYDATA)
+    t = ServeKeyThread(KEYDATA, fpr)
     stop_t = Thread(target=stop_thread, args=(t,timeout))
     stop_t.daemon = True
     t.start()

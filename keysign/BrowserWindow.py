@@ -59,13 +59,13 @@ class MainWindow(Gtk.Application):
         # create notebook container
         notebook = Gtk.Notebook()
         notebook.append_page(KeySignSection(self), Gtk.Label('Keys'))
-        #notebook.append_page(GetKeySection(self), Gtk.Label('Get Key'))
+        notebook.append_page(GetKeySection(self), Gtk.Label('Get Key'))
         self.window.add(notebook)
 
-        '''quit = Gio.SimpleAction(name="quit", parameter_type=None)
+        quit = Gio.SimpleAction(name="quit", parameter_type=None)
         self.add_action(quit)
         self.add_accelerator("<Primary>q", "app.quit", None)
-        quit.connect("activate", self.on_quit)'''
+        quit.connect("activate", self.on_quit)
 
         # Avahi services
         self.avahi_browser = None
@@ -77,17 +77,24 @@ class MainWindow(Gtk.Application):
         self.port = 9001
 
         ## App menus
-        '''appmenu = Gio.Menu.new()
+        appmenu = Gio.Menu.new()
         section = Gio.Menu.new()
-        appmenu.append_section(None, section)'''
+        appmenu.append_section(None, section)
+
+        some_action = Gio.SimpleAction.new("scan-image", None)
+        some_action.connect('activate', self.on_scan_image)
+        self.add_action(some_action)
+        some_item = Gio.MenuItem.new("Scan Image", "app.scan-image")
+        section.append_item(some_item)
+
+        quit_item = Gio.MenuItem.new("Quit", "app.quit")
+        section.append_item(quit_item)
+
+        self.set_app_menu(appmenu)
 
 
-        #quit_item = Gio.MenuItem.new("Quit", "app.quit")
-        #section.append_item(quit_item)
-
-        #self.set_app_menu(appmenu)
-
-
+    def on_scan_image(self, *args, **kwargs):
+        print("scanimage")
 
 
     def on_activate(self, app):
@@ -125,6 +132,46 @@ class MainWindow(Gtk.Application):
 
     def stop_server(self):
         self.keyserver.shutdown()
+
+
+    def on_new_service(self, browser, name, address, port, txt_dict):
+        published_fpr = txt_dict.get('fingerprint', None)
+
+        self.log.info("Probably discovered something, let's check; %s %s:%i:%s",             name, address, port, published_fpr)
+
+        if self.verify_service(name, address, port):
+            GLib.idle_add(self.add_discovered_service, name, address, port, published_fpr)
+        else:
+            self.log.warn("Client was rejected: %s %s %i",
+                        name, address, port)
+
+
+    def on_remove_service(self, browser, service_type, name):
+        '''Receives on_remove signal from avahibrowser.py to remove service from list and
+        transfers data to remove_discovered_service'''
+        self.log.info("Received a remove signal, let's check; %s:%s", service_type, name)
+        GLib.idle_add(self.remove_discovered_service, name)
+
+
+    def verify_service(self, name, address, port):
+        '''A tiny function to return whether the service
+        is indeed something we are interested in'''
+        return True
+
+
+    def add_discovered_service(self, name, address, port, published_fpr):
+        self.discovered_services += ((name, address, port, published_fpr), )
+        #List needs to be modified when server services are removed.
+        self.log.info("Clients currently in list '%s'", self.discovered_services)
+        return False
+
+
+    def remove_discovered_service(self, name):
+        '''Sorts and removes server-side clients from discovered_services list
+        by the matching server name which includes the fpr.'''
+        [self.discovered_services.remove(clients)
+        for clients in self.discovered_services if clients[0] == name]
+        self.log.info("Clients currently in list '%s'", self.discovered_services)
 
 
 def main():

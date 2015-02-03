@@ -46,6 +46,7 @@ from gi.repository import GdkX11
 from gi.repository import GstVideo
 
 import key
+from gi.repository import Gtk, GLib, Gio
 
 Gst.init([])
 
@@ -112,6 +113,25 @@ def MinimalExport(keydata):
     stripped_key = tmpkeyring.export_data(fingerprint)
     return stripped_key
 
+
+class HelloWorldApp(Gtk.Application):
+    def __init__(self):
+        Gtk.Application.__init__(self, application_id="apps.test.helloworld",
+                                 flags=Gio.ApplicationFlags.FLAGS_NONE)
+        self.connect("activate", self.on_activate)
+
+    def on_activate(self, data=None):
+        window = Gtk.Window(type=Gtk.WindowType.TOPLEVEL)
+        window.set_title("Gtk3 Python Example")
+        window.set_border_width(24)
+        get_key_section = GetKeySection(self)
+        notebook = Gtk.Notebook()
+        notebook.append_page(GetKeySection(self), Gtk.Label('Get Key'))
+        window.add(notebook)
+
+
+        window.show_all()
+        self.add_window(window)
 
 
 class TempKeyringCopy(TempKeyring):
@@ -593,4 +613,6 @@ passwords."""
         # return label
         return None
 
-
+if __name__ == "__main__":
+    app = HelloWorldApp()
+    app.run(None)

@@ -24,8 +24,8 @@ from monkeysign.gpg import Keyring, TempKeyring
 
 from KeysPage import KeysPage
 from KeyPresent import KeyPresentPage
+import Keyserver
 from SignPages import KeyDetailsPage
-import MainWindow
 
 from gi.repository import Gst, Gtk, GLib
 
@@ -35,17 +35,12 @@ import key
 
 class KeySignSection(Gtk.VBox):
 
-    def __init__(self, app):
+    def __init__(self):
         '''Initialises the section which lets the user
         choose a key to be signed by other person.
-
-        ``app'' should be the "app" itself. The place
-        which holds global app data, especially the discovered
-        clients on the network.
         '''
         super(KeySignSection, self).__init__()
 
-        self.app = app
         self.log = logging.getLogger()
         self.keyring = Keyring()
 
@@ -86,6 +81,8 @@ class KeySignSection(Gtk.VBox):
         # it will save the key data in this field
         self.received_key_data = None
 
+        self.keyserver = None
+
 
     def on_key_selection_changed(self, pane, keyid):
         '''This callback is attached to the signal which is emitted
@@ -109,7 +106,7 @@ class KeySignSection(Gtk.VBox):
         keydata = self.keyring.context.stdout
 
         self.log.debug("Keyserver switched on! Serving key with fpr: %s", fpr)
-        self.app.setup_server(keydata, fpr)
+        self.setup_server(keydata, fpr)
         
         self.switch_to_key_present_page(key)
 
@@ -148,11 +145,24 @@ class KeySignSection(Gtk.VBox):
 
             if page_index == 1:
                 self.log.debug("Keyserver switched off")
-                self.app.stop_server()
+                self.stop_server()
 
             self.notebook.prev_page()
 
 
+    def setup_server(self, keydata, fingerprint):
+        """
+        Starts the key-server which serves the provided keydata and
+        announces the fingerprint as TXT record using Avahi
+        """
+        self.log.info('Serving now')
+        self.log.debug('About to call %r', Keyserver.ServeKeyThread)
+        self.keyserver = Keyserver.ServeKeyThread(str(keydata), fingerprint)
+        self.log.info('Starting thread %r', self.keyserver)
+        self.keyserver.start()
+        self.log.info('Finsihed serving')
+        return False
 
 
-
+    def stop_server(self):
+        self.keyserver.shutdown()

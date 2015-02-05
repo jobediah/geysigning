@@ -31,19 +31,21 @@ import sys
 import re
 
 from monkeysign.gpg import Keyring, TempKeyring
+from monkeysign.ui import MonkeysignUi
 from monkeysign.gpg import GpgRuntimeError
 
 from SignPages import ScanFingerprintPage, SignKeyPage, PostSignPage
 
+from network.AvahiBrowser import AvahiBrowser
+
 import key
 
-from gi.repository import Gst, Gtk, GLib
+from gi.repository import Gst, Gtk, GLib, Gio
 # Because of https://bugzilla.gnome.org/show_bug.cgi?id=698005
 from gi.repository import GdkX11
 # Needed for window.get_xid(), xvimagesink.set_window_handle(), respectively:
 from gi.repository import GstVideo
 
-import key
 
 Gst.init([])
 
@@ -109,6 +111,126 @@ def MinimalExport(keydata):
     fingerprint, key = keys.items()[0]
     stripped_key = tmpkeyring.export_data(fingerprint)
     return stripped_key
+
+
+class GnomeKeysignClient(Gtk.Application):
+    def __init__(self):
+        Gtk.Application.__init__(self)
+        self.connect("activate", self.on_activate)
+        self.connect("startup", self.on_startup)
+
+        self.log = logging.getLogger()
+        self.log = logging
+
+    def on_quit(self, app, param=None):
+        self.quit()
+
+
+    def on_startup(self, app):
+        self.log.info("Startup")
+        self.window = Gtk.ApplicationWindow(application=app)
+        self.window.set_title ("Keysign")
+
+        self.window.set_border_width(10)
+        self.window.set_position(Gtk.WindowPosition.CENTER)
+
+        # create notebook container
+        notebook = Gtk.Notebook()
+        notebook.append_page(GetKeySection(self), Gtk.Label('Get Key'))
+        self.window.add(notebook)
+
+        quit = Gio.SimpleAction(name="quit", parameter_type=None)
+        self.add_action(quit)
+        self.add_accelerator("<Primary>q", "app.quit", None)
+        quit.connect("activate", self.on_quit)
+
+        # Avahi services
+        self.avahi_browser = None
+        self.avahi_service_type = '_geysign._tcp'
+        self.discovered_services = []
+        GLib.idle_add(self.setup_avahi_browser)
+
+        ## App menus
+        appmenu = Gio.Menu.new()
+        section = Gio.Menu.new()
+        appmenu.append_section(None, section)
+
+        some_action = Gio.SimpleAction.new("scan-image", None)
+        some_action.connect('activate', self.on_scan_image)
+        self.add_action(some_action)
+        some_item = Gio.MenuItem.new("Scan Image", "app.scan-image")
+        section.append_item(some_item)
+
+        quit_item = Gio.MenuItem.new("Quit", "app.quit")
+        section.append_item(quit_item)
+
+        self.set_app_menu(appmenu)
+
+
+    def on_scan_image(self, *args, **kwargs):
+        print("scanimage")
+
+
+    def on_activate(self, app):
+        self.log.info("Activate!")
+        #self.window = Gtk.ApplicationWindow(application=app)
+        print "Tobi will be mad if I forget to take these out, on-activate."
+        self.window.show_all()
+        # In case the user runs the application a second time,
+        # we raise the existing window.
+        # self.window.present()
+
+
+    def setup_avahi_browser(self):
+        # FIXME: place a proper service type
+        self.avahi_browser = AvahiBrowser(service=self.avahi_service_type)
+        self.avahi_browser.connect('new_service', self.on_new_service)
+        self.avahi_browser.connect('remove_service', self.on_remove_service)
+        print "Tobi will be mad if I forget to take these out, setup browser."
+        return False
+
+
+    def on_new_service(self, browser, name, address, port, txt_dict):
+        published_fpr = txt_dict.get('fingerprint', None)
+        print "Tobi will be mad if I forget to take these out, on_new."
+        self.log.info("Probably discovered something, let's check; %s %s:%i:%s",             name, address, port, published_fpr)
+
+        if self.verify_service(name, address, port):
+            GLib.idle_add(self.add_discovered_service, name, address, port, published_fpr)
+        else:
+            self.log.warn("Client was rejected: %s %s %i",
+                        name, address, port)
+
+
+    def on_remove_service(self, browser, service_type, name):
+        '''Receives on_remove signal from avahibrowser.py to remove service from list and
+        transfers data to remove_discovered_service'''
+        self.log.info("Received a remove signal, let's check; %s:%s", service_type, name)
+        GLib.idle_add(self.remove_discovered_service, name)
+
+
+    def verify_service(self, name, address, port):
+        '''A tiny function to return whether the service
+        is indeed something we are interested in'''
+        print "Tobi will be mad if I forget to take these out, verify."
+        return True
+
+
+    def add_discovered_service(self, name, address, port, published_fpr):
+        print "Tobi will be mad if I forget to take these out, add_discovered."
+        self.discovered_services += ((name, address, port, published_fpr), )
+        #List needs to be modified when server services are removed.
+        self.log.info("Clients currently in list '%s'", self.discovered_services)
+        return False
+
+
+    def remove_discovered_service(self, name):
+        '''Sorts and removes server-side clients from discovered_services list
+        by the matching server name which includes the fpr.'''
+        print "Tobi will be mad if I forget to take these out, remove_discovered."
+        [self.discovered_services.remove(clients)
+        for clients in self.discovered_services if clients[0] == name]
+        self.log.info("Clients currently in list '%s'", self.discovered_services)
 
 
 
@@ -527,3 +649,71 @@ class GetKeySection(Gtk.VBox):
         self.received_key_data = keydata
         openpgpkey = self.tmpkeyring.get_keys(fingerprint).values()[0]
         self.signPage.display_downloaded_key(openpgpkey, fingerprint)
+
+
+
+class SignUi(MonkeysignUi):
+    """sign a key in a safe fashion.
+
+This program assumes you have gpg-agent configured to prompt for
+passwords."""
+
+    def __init__(self, app, args = None):
+        super(SignUi, self).__init__(args)
+
+        self.app = app
+
+
+    def main(self):
+
+        MonkeysignUi.main(self)
+
+    def yes_no(self, prompt, default = None):
+        # dialog = Gtk.MessageDialog(self.app.window, 0, Gtk.MessageType.INFO,
+        #             Gtk.ButtonsType.YES_NO, prompt)
+        # response = dialog.run()
+        # dialog.destroy()
+
+        # return response == Gtk.ResponseType.YES
+        # Simply return True for now
+        return True
+
+    def choose_uid(self, prompt, key):
+        # dialog = Gtk.Dialog(prompt, self.app.window, 0,
+        #         (Gtk.STOCK_CANCEL, Gtk.ResponseType.REJECT,
+        #          Gtk.STOCK_OK, Gtk.ResponseType.ACCEPT))
+
+        # label = Gtk.Label(prompt)
+        # dialog.vbox.pack_start(label, False, False, 0)
+        # label.show()
+
+        # self.uid_radios = None
+        # for uid in key.uidslist:
+        #     r = Gtk.RadioButton.new_with_label_from_widget(
+        #                 self.uid_radios, uid.uid)
+        #     r.show()
+        #     dialog.vbox.pack_start(r, False, False, 0)
+
+        #     if self.uid_radios is None:
+        #         self.uid_radios = r
+        #         self.uid_radios.set_active(True)
+        #     else:
+        #         self.uid_radios.set_active(False)
+
+        # response = dialog.run()
+
+        # label = None
+        # if response == Gtk.ResponseType.ACCEPT:
+        #     self.app.log.info("okay signing")
+        #     label = [ r for r in self.uid_radios.get_group() if r.get_active()][0].get_label()
+        # else:
+        #     self.app.log.info('user denied signature')
+
+        # dialog.destroy()
+        # return label
+        return None
+
+if __name__ == "__main__":
+    app = GnomeKeysignClient()
+
+    app.run(None)

@@ -53,6 +53,7 @@ class SigneesApp(Gtk.Application):
         self.client_list = []
 
         self._mainloop = GObject.MainLoop()
+        self.connect("delete-event", self.on_quit)
 
         GLib.idle_add(self.browse)
 
@@ -67,6 +68,10 @@ class SigneesApp(Gtk.Application):
         window.add(self.label)
         window.show_all()
         self.add_window(window)
+
+
+    def on_quit(self, data=None):
+        self._mainloop.quit()
 
 
     def browse(self):

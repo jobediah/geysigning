@@ -102,7 +102,7 @@ class SigneesApp(Gtk.Application):
 
     def print_error(self, *args):
         self.log.warn('error_handler')
-        print args[0]
+        self.log(args[0])
 
 
     def reset_label(self,data):

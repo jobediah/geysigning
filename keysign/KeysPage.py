@@ -112,8 +112,6 @@ class KeysPage(Gtk.VBox):
         # create the tree view
         self.treeView = Gtk.TreeView(model=self.store)
 
-        column = Gtk.TreeViewColumn()
-
         # setup 'Name' column
         nameRenderer = Gtk.CellRendererText()
         nameColumn = Gtk.TreeViewColumn("Name", nameRenderer, text=0)

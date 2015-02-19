@@ -105,8 +105,14 @@ class KeysPage(Gtk.VBox):
 
                 self.store.append((name, email, keyid))
 
+        self.grid = Gtk.Grid()
+        Gtk.Grid.set_column_homogeneous(self.grid, True)
+        Gtk.Grid.set_row_homogeneous(self.grid, True)
+
         # create the tree view
         self.treeView = Gtk.TreeView(model=self.store)
+
+        column = Gtk.TreeViewColumn()
 
         # setup 'Name' column
         nameRenderer = Gtk.CellRendererText()
@@ -123,7 +129,7 @@ class KeysPage(Gtk.VBox):
         self.treeView.append_column(nameColumn)
         self.treeView.append_column(emailColumn)
         self.treeView.append_column(keyColumn)
-        
+
         self.treeView.connect('row-activated', self.on_row_activated)
 
         # make the tree view resposive to single click selection
@@ -131,27 +137,18 @@ class KeysPage(Gtk.VBox):
 
         # make the tree view scrollable
         self.scrolled_window = Gtk.ScrolledWindow()
-        self.scrolled_window.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         self.scrolled_window.add(self.treeView)
-        self.scrolled_window.set_min_content_height(200)
 
-        #self.pack_start(self.scrolled_window, True, True, 0)
+        self.grid.attach(self.scrolled_window, 0, 0, 3, 1)
 
-        self.hpane = Gtk.HPaned()
-        self.hpane.pack1(self.scrolled_window, False, False)
         self.right_pane = Gtk.VBox()
         right_label = Gtk.Label(label='Select key on the left')
         self.right_pane.add(right_label)
-        # Hm, right now, the width of the right pane changes, when
-        # a key is selected, because the right pane's content will be
-        # wider when it displays expiration et al.
-        # Can we hint at that fact and make the VBox a bit wider than necessary?
-        #padded_label = Gtk.Label(label='Select key on the left'*3)
-        #self.right_pane.add(padded_label)
-        self.hpane.pack2(self.right_pane, True, False)
+        self.grid.attach_next_to(self.right_pane, self.scrolled_window,
+                                  Gtk.PositionType.RIGHT, 1,1)
 
-        self.pack_start(self.hpane, True, True, 0)
-
+        self.pack_start(self.grid, True, True, 0)
 
     # We could make it a @staticmethod, but the returned items
     # are bound to the model, anyway.  So it probably doesn't

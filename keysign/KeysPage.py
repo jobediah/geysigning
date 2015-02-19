@@ -106,8 +106,8 @@ class KeysPage(Gtk.VBox):
                 self.store.append((name, email, keyid))
 
         self.grid = Gtk.Grid()
-        Gtk.Grid.set_column_homogeneous(self.grid, True)
-        Gtk.Grid.set_row_homogeneous(self.grid, True)
+        self.grid.set_column_homogeneous(True)
+        self.grid.set_row_homogeneous(True)
 
         # create the tree view
         self.treeView = Gtk.TreeView(model=self.store)

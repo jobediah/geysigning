@@ -353,6 +353,8 @@ class GetKeySection(Gtk.VBox):
         self.scanPage.scanFrame.connect('barcode', self.on_barcode)
         #GLib.idle_add(        self.scanFrame.run)
 
+        self.scanPage.connect('fingerprint_entered', self.on_typed_entry)
+
         # A list holding references to temporary files which should probably
         # be cleaned up on exit...
         self.tmpfiles = []
@@ -389,6 +391,16 @@ class GetKeySection(Gtk.VBox):
                 self.on_button_clicked(self.nextButton, pgpkey, message)
         else:
             self.log.error("data found in barcode does not match a OpenPGP fingerprint pattern: %s", barcode)
+
+
+    def on_typed_entry(self, signal, typed_fpr):
+        '''Evaluates typed fpr for a match to clients available, advances to the next page
+        if true'''
+        fpr = self.verify_fingerprint(typed_fpr)
+        for client in self.app.discovered_services:
+            if fpr == client[3]:
+                self.on_button_clicked(self.nextButton, fpr)
+                return None
 
 
     def download_key_http(self, address, port):
@@ -610,17 +622,11 @@ class GetKeySection(Gtk.VBox):
                     # If we call on_button_clicked() from on_barcode()
                     # then we get extra arguments
                     pgpkey = args[0]
-                    message = args[1]
-                    fingerprint = pgpkey.fingerprint
-                else:
-                    raw_text = self.scanPage.get_text_from_textview()
-                    fingerprint = self.verify_fingerprint(raw_text)
-
-                    if fingerprint == None:
-                        self.log.error("The fingerprint typed was wrong."
-                        " Please re-check : {}".format(raw_text))
-                        # FIXME: make it to stop switch the page if this happens
-                        return
+                    try:
+                        message = args[1]
+                        fingerprint = pgpkey.fingerprint
+                    except:
+                        fingerprint = pgpkey
 
                 # save a reference to the last received fingerprint
                 self.last_received_fingerprint = fingerprint

@@ -22,7 +22,7 @@ import logging
 import sys
 import StringIO
 
-from gi.repository import GObject, Gtk, GLib, GdkPixbuf
+from gi.repository import GObject, Gtk, GLib, GdkPixbuf, Gdk
 from monkeysign.gpg import Keyring
 from qrencode import encode_scaled
 
@@ -244,6 +244,10 @@ class KeyDetailsPage(Gtk.VBox):
 # Pages for "Get Key" Tab
 
 class ScanFingerprintPage(Gtk.HBox):
+    __gsignals__ = {
+        'fingerprint_entered': (GObject.SIGNAL_RUN_LAST, None,
+                (str,))
+    }
 
     def __init__(self):
         super(ScanFingerprintPage, self).__init__()
@@ -255,9 +259,9 @@ class ScanFingerprintPage(Gtk.HBox):
         rightLabel = Gtk.Label()
         rightLabel.set_markup('... or scan QR code')
 
-        # set up text editor
-        self.textview = Gtk.TextView()
-        self.textbuffer = self.textview.get_buffer()
+        #set up text entry box
+        self.textview = Gtk.Entry()
+        self.textview.connect("key-release-event", self.on_key_release)
 
         # set up scrolled window
         scrolledwindow = Gtk.ScrolledWindow()
@@ -291,16 +295,20 @@ class ScanFingerprintPage(Gtk.HBox):
         self.pack_start(rightBox, True, True, 0)
 
 
-    def get_text_from_textview(self):
-        '''Returns the contents of the fingerprint
-        input widget.  Note that this function does
-        not format or validate anything.
-        '''
-        start_iter = self.textbuffer.get_start_iter()
-        end_iter = self.textbuffer.get_end_iter()
-        raw_text = self.textbuffer.get_text(start_iter, end_iter, False)
-        
-        return raw_text
+    def on_key_release(self, widget, ev, data=None):
+        '''Evaluates each alpha numeric entry'''
+
+        if chr(ev.keyval).isalnum():
+            self.emit_text_entry()
+
+
+    def emit_text_entry(self):
+        '''Retrieves text from entry box and emits signal with entry when appropriate length'''
+        raw_text = self.textview.get_text()
+        raw_text.replace(" ", "")
+        #Program emits signal when text length is that of a fingerprint
+        if len(raw_text) == 40:
+            self.emit('fpr', raw_text)
 
 
     def on_loadbutton_clicked(self, *args, **kwargs):

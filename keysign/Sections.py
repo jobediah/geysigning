@@ -400,7 +400,7 @@ class GetKeySection(Gtk.VBox):
         for client in self.app.discovered_services:
             if fpr == client[3]:
                 self.on_button_clicked(self.nextButton, fpr)
-                return None
+                break
 
 
     def download_key_http(self, address, port):
@@ -618,15 +618,14 @@ class GetKeySection(Gtk.VBox):
 
             page_index = self.notebook.get_current_page()
             if page_index == 1:
-                if args:
+                if len(sys.argv) > 1:
                     # If we call on_button_clicked() from on_barcode()
                     # then we get extra arguments
                     pgpkey = args[0]
-                    try:
-                        message = args[1]
-                        fingerprint = pgpkey.fingerprint
-                    except:
-                        fingerprint = pgpkey
+                    message = args[1]
+                    fingerprint = pgpkey.fingerprint
+                else:
+                    fingerprint = args[0]
 
                 # save a reference to the last received fingerprint
                 self.last_received_fingerprint = fingerprint

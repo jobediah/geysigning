@@ -260,12 +260,12 @@ class ScanFingerprintPage(Gtk.HBox):
         rightLabel.set_markup('... or scan QR code')
 
         #set up text entry box
-        self.textview = Gtk.Entry()
-        self.textview.connect("key-release-event", self.on_key_release)
+        self.entry_box = Gtk.Entry()
+        self.entry_box.connect("key-release-event", self.on_key_release)
 
         # set up scrolled window
         scrolledwindow = Gtk.ScrolledWindow()
-        scrolledwindow.add(self.textview)
+        scrolledwindow.add(self.entry_box)
 
         # set up webcam frame
         self.scanFrame = Gtk.Frame(label='QR Scanner')
@@ -297,18 +297,20 @@ class ScanFingerprintPage(Gtk.HBox):
 
     def on_key_release(self, widget, ev, data=None):
         '''Evaluates each alpha numeric entry'''
+        try:
+            if chr(ev.keyval).isalnum():
+                self.emit_text_entry()
 
-        if chr(ev.keyval).isalnum():
-            self.emit_text_entry()
-
+        except ValueError:
+            pass
 
     def emit_text_entry(self):
         '''Retrieves text from entry box and emits signal with entry when appropriate length'''
-        raw_text = self.textview.get_text()
+        raw_text = self.entry_box.get_text()
         raw_text.replace(" ", "")
         #Program emits signal when text length is that of a fingerprint
         if len(raw_text) == 40:
-            self.emit('fpr', raw_text)
+            self.emit('fingerprint_entered', raw_text)
 
 
     def on_loadbutton_clicked(self, *args, **kwargs):

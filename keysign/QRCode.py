@@ -21,6 +21,12 @@ import StringIO
 from gi.repository import Gdk, Gtk, GdkPixbuf
 from qrencode import encode_scaled
 
+import sys
+import hashlib
+import monkeysign
+if sys.version_info<(3,4):
+    import sha3
+
 log = logging.getLogger()
 
 class QRImage(Gtk.DrawingArea):
@@ -91,6 +97,14 @@ class QRImage(Gtk.DrawingArea):
     @staticmethod
     def create_qrcode(data, size):
         '''Creates a PIL image for the data given'''
+        monkey = monkeysign.gpg.Keyring()
+        signature = monkey.export_data(fpr=None, secret=False)
+
+        sha = hashlib.new("sha3_512")
+        sha.update(signature)
+        shasum = sha.hexdigest()
+        data = data + "?sha3sum=%s" % shasum
+
         log.debug('Encoding %s', data)
         version, width, image = encode_scaled(data,size,0,1,2,True)
         return image

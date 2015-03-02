@@ -97,11 +97,13 @@ class QRImage(Gtk.DrawingArea):
     @staticmethod
     def create_qrcode(data, size):
         '''Creates a PIL image for the data given'''
+        fpr = data[12:]
         monkey = monkeysign.gpg.Keyring()
-        signature = monkey.export_data(fpr=None, secret=False)
+        monkey.context.set_option('export-options', 'export-minimal')
+        stripped_key = monkey.export_data(fpr)
 
         sha = hashlib.new("sha3_512")
-        sha.update(signature)
+        sha.update(stripped_key)
         shasum = sha.hexdigest()
         data = data + "?sha3sum=%s" % shasum
 

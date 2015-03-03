@@ -28,6 +28,9 @@ import requests
 from requests.exceptions import ConnectionError
 
 import sys
+import hashlib
+if sys.version_info<(3,4):
+    import sha3
 
 from monkeysign.gpg import Keyring, TempKeyring
 from monkeysign.ui import MonkeysignUi
@@ -40,8 +43,6 @@ from KeyPresent import KeyPresentPage
 from SignPages import KeyDetailsPage
 from SignPages import ScanFingerprintPage, SignKeyPage, PostSignPage
 import MainWindow
-
-import key
 
 from gi.repository import Gst, Gtk, GLib
 # Because of https://bugzilla.gnome.org/show_bug.cgi?id=698005
@@ -376,8 +377,8 @@ class GetKeySection(Gtk.VBox):
         '''This is connected to the "barcode" signal.
         The message argument is a GStreamer message that created
         the barcode.'''
-
-        fpr = self.verify_fingerprint(barcode)
+        fpr, shasum = self.parse_barcode(barcode)
+        message = None
 
         if fpr != None:
             try:
@@ -385,10 +386,28 @@ class GetKeySection(Gtk.VBox):
             except key.KeyError:
                 self.log.exception("Could not create key from %s", barcode)
             else:
-                self.log.info("Barcode signal %s %s" %( pgpkey.fingerprint, message))
-                self.on_button_clicked(self.nextButton, pgpkey, message)
+                self.log.info("Barcode signal %s %s" %(fpr, message))
+                self.on_button_clicked(self.nextButton, fpr, shasum, message)
         else:
             self.log.error("data found in barcode does not match a OpenPGP fingerprint pattern: %s", barcode)
+
+    def parse_barcode(self, barcode):
+        '''Parses the barcode into a fingerprint and hashsum'''
+        fpr = None
+        shasum = None
+        fpr_pattern = "OPENPGP4FPR:"
+        shasum_pattern = "?sha3sum="
+
+        try:
+            fpr_index = barcode.find(fpr_pattern) +12
+            shasum_index = barcode.find(shasum_pattern)
+            fpr = barcode[fpr_index:shasum_index]
+            shasum = barcode[shasum_index + 9:]
+
+        except ValueError:
+            self.log.exception("Could find fpr or hash sum in barcode", barcode)
+
+        return fpr, shasum
 
 
     def download_key_http(self, address, port):
@@ -414,11 +433,20 @@ class GetKeySection(Gtk.VBox):
                 self.log.exception("While downloading key from %s %i",
                                     address, port)
 
-    def verify_downloaded_key(self, downloaded_data, fingerprint):
+    def verify_downloaded_key(self, downloaded_data, fingerprint, downloaded_shasum):
         # FIXME: implement a better and more secure way to verify the key
         if self.tmpkeyring.import_data(downloaded_data):
             imported_key_fpr = self.tmpkeyring.get_keys().keys()[0]
-            if imported_key_fpr == fingerprint:
+            downloaded_data = downloaded_data.encode('utf-8')
+
+            sha = hashlib.new("sha3_512")
+            sha.update(downloaded_data)
+            sha3sum = sha.hexdigest()
+
+            if downloaded_shasum == sha3sum:
+                downloaded_shasum = True
+
+            if imported_key_fpr == fingerprint and downloaded_shasum:
                 result = True
             else:
                 self.log.info("Key does not have equal fp: %s != %s", imported_key_fpr, fingerprint)
@@ -436,7 +464,7 @@ class GetKeySection(Gtk.VBox):
         self.log.info("Check if list is sorted '%s'", clients)
         return clients
 
-    def obtain_key_async(self, fingerprint, callback=None, data=None, error_cb=None):
+    def obtain_key_async(self, fingerprint, shasum, callback=None, data=None, error_cb=None):
         other_clients = self.app.discovered_services
         self.log.debug("The clients found on the network: %s", other_clients)
 
@@ -447,7 +475,7 @@ class GetKeySection(Gtk.VBox):
         other_clients = self.sort_clients(other_clients, fingerprint)
 
         for keydata in self.try_download_keys(other_clients):
-            if self.verify_downloaded_key(keydata, fingerprint):
+            if self.verify_downloaded_key(keydata, fingerprint, shasum):
                 is_valid = True
             else:
                 is_valid = False
@@ -609,12 +637,13 @@ class GetKeySection(Gtk.VBox):
                 if args:
                     # If we call on_button_clicked() from on_barcode()
                     # then we get extra arguments
-                    pgpkey = args[0]
-                    message = args[1]
-                    fingerprint = pgpkey.fingerprint
+                    fingerprint = args[0]
+                    shasum = args[1]
+                    message = args[2]
                 else:
                     raw_text = self.scanPage.get_text_from_textview()
                     fingerprint = self.verify_fingerprint(raw_text)
+                    shasum = True
 
                     if fingerprint == None:
                         self.log.error("The fingerprint typed was wrong."
@@ -631,7 +660,7 @@ class GetKeySection(Gtk.VBox):
                         .format(fingerprint))
                 # use GLib.idle_add to use a separate thread for the downloading of
                 # the keydata
-                GLib.idle_add(self.obtain_key_async, fingerprint, self.recieved_key,
+                GLib.idle_add(self.obtain_key_async, fingerprint, shasum, self.recieved_key,
                         fingerprint, err)
 
 

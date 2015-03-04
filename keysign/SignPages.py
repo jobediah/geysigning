@@ -308,8 +308,9 @@ class ScanFingerprintPage(Gtk.HBox):
         '''Retrieves text from entry box and emits signal with entry when appropriate length'''
         raw_text = self.entry_box.get_text()
         raw_text.replace(" ", "")
-        #Program emits signal when text length is that of a fingerprint
-        if len(raw_text) == 40:
+
+        #Program emits signal when text length and type is that of a fingerprint
+        if len(raw_text)==40 and not(raw_text.isalpha()) and not(raw_text.isdigit()):
             self.emit('fingerprint_entered', raw_text)
 
 

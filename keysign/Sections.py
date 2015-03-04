@@ -618,13 +618,9 @@ class GetKeySection(Gtk.VBox):
 
             page_index = self.notebook.get_current_page()
             if page_index == 1:
-                if len(sys.argv) > 1:
+                if args:
                     # If we call on_button_clicked() from on_barcode()
                     # then we get extra arguments
-                    pgpkey = args[0]
-                    message = args[1]
-                    fingerprint = pgpkey.fingerprint
-                else:
                     fingerprint = args[0]
 
                 # save a reference to the last received fingerprint

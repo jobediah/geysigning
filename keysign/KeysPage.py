@@ -136,9 +136,11 @@ class KeysPage(Gtk.VBox):
         # make the tree view scrollable
         self.scrolled_window = Gtk.ScrolledWindow()
         self.scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        self.scrolled_window.set_vexpand(True)
         self.scrolled_window.add(self.treeView)
 
         self.grid.attach(self.scrolled_window, 0, 0, 3, 1)
+        self.grid.attach_next_to(self.treeView, self.scrolled_window, Gtk.PositionType.BOTTOM, 1, 1)
 
         self.right_pane = Gtk.VBox()
         right_label = Gtk.Label(label='Select key on the left')
